@@ -2,6 +2,8 @@
 
 ![](./demo.png)
 
+# JitWord Web SDK 使用文档
+
 JitWord SDK 提供了一个简单的方式将强大的协同文档编辑器集成到您的 Web 应用中。支持 Vue、React、Angular 以及原生 HTML/JS 项目。
 
 ## 1. 目标
@@ -225,7 +227,8 @@ server {
 
 | 参数名 | 类型 | 必填 | 默认值 | 说明 |
 | :--- | :--- | :---: | :--- | :--- |
-| `value` | `object` \| `string` | | - | 文档初始内容（JSON 或 HTML） |
+| `value` | `object` \| `string` | | - | 文档初始内容（优先级高于 defaultValue） |
+| `defaultValue` | `object` \| `string` | | - | 默认内容（仅当文档为空时使用） |
 | `enableAutoSave` | `boolean` | | `false` | 是否启用自动保存 |
 | `enableAutoLoad` | `boolean` | | `false` | 是否启用自动加载 |
 | `onChange` | `(content) => void` | | - | 内容变化回调 |
@@ -233,28 +236,13 @@ server {
 | `onEditorReady` | `(editor) => void` | | - | 编辑器就绪回调 |
 | `uploadAPI` / `uploadFn` | `(file: File) => Promise<string>` | | - | 文件上传函数，返回文件 URL |
 
-#### 4.1.5 离线模式配置
+#### 4.1.5 API 配置
 
 | 参数名 | 类型 | 必填 | 默认值 | 说明 |
 | :--- | :--- | :---: | :--- | :--- |
-| `offlineMode` | `boolean` | | **`false`** | 是否启用离线模式（使用 localStorage 代替 API） |
-| `offlineStorageKey` | `string` | | `'jitword_offline_data'` | 离线数据在 localStorage 中的键名 |
+| `baseApiUrl` | `string` | | - | 后端 API 基础路径 |
 
-> **🔌 离线模式说明**:
-> - 当 `offlineMode: true` 时，所有数据（文档、评论、版本）都存储在浏览器 localStorage 中
-> - 离线模式**自动禁用**协同编辑功能（`enableCollaboration` 会被强制设为 `false`）
-> - 适用场景：演示、离线体验、无需后端的独立应用
-> - ⚠️ 注意：localStorage 有容量限制（~5-10MB），数据仅保存在本地浏览器，无法跨设备同步
-
-#### 4.1.6 API 配置
-
-| 参数名 | 类型 | 必填 | 默认值 | 说明 |
-| :--- | :--- | :---: | :--- | :--- |
-| `baseApiUrl` | `string` | | - | 后端 API 基础路径（在线模式时必需） |
-
-> **提示**: 如果启用了 `offlineMode`，则 `baseApiUrl` 会被忽略。
-
-#### 4.1.7 UI 事件回调
+#### 4.1.6 UI 事件回调
 
 | 参数名 | 类型 | 说明 |
 | :--- | :--- | :--- |
@@ -269,7 +257,340 @@ server {
 
 ### 4.2 数据格式说明
 
-`value` 支持 JSON 或 HTML 格式。
+`value` 和 `defaultValue` 均支持 JSON 或 HTML 格式，两者的区别在于：
+- **`value`**: 用于**受控模式**或**回显已有数据**。如果设置了 `value`，编辑器会优先加载它。
+- **`defaultValue`**: 用于**非受控模式**或**新建文档**。只有当编辑器内容为空（且 `value` 未设置或为空）时，才会自动填充此内容。
+
+**建议**：
+
+## 4.3 实例级内容 API
+
+`new Jitword(config)` 返回的实例除了已有的 `setContent`、`getJSON`、`getHTML` 等方法外，现已支持第一阶段的元素级 API。
+
+### 4.3.1 适用范围
+
+当前第一阶段支持的顶层元素类型：
+
+- `paragraph`
+- `heading`
+- `image`
+- `attachment`
+- `divider`
+- `bulletList`
+- `orderedList`
+
+说明：
+
+- SDK 中的“元素”指的是文档顶层 block 元素
+- `index` 表示顶层元素序号，从 `0` 开始
+- 若元素未传 `id`，SDK 会自动生成唯一 ID
+- 在只读模式下，写操作会被拒绝
+
+### 4.3.2 插入元素
+
+```ts
+insert(index?: number, element: SDKElement): SDKElement
+```
+
+示例：
+
+```js
+const element = editor.insert(1, {
+  type: 'paragraph',
+  data: {
+    text: '这是一段通过 insert() 插入的文本'
+  }
+})
+
+console.log(element.id)
+```
+
+插入图片：
+
+```js
+editor.insert({
+  type: 'image',
+  data: {
+    url: 'https://picsum.photos/640/360',
+    alt: '示例图片'
+  }
+})
+```
+
+### 4.3.3 获取指定元素
+
+```ts
+getElementById(elementId: string): SDKElement | null
+```
+
+示例：
+
+```js
+const element = editor.getElementById('paragraph-123')
+
+if (element) {
+  console.log('元素类型:', element.type)
+  console.log('元素数据:', element.data)
+}
+```
+
+### 4.3.4 删除指定元素
+
+```ts
+deleteElementById(elementId: string): boolean
+```
+
+示例：
+
+```js
+const ok = editor.deleteElementById('paragraph-123')
+console.log('删除结果:', ok)
+```
+
+### 4.3.5 更新指定元素
+
+```ts
+updateElement(elementId: string, patch: Partial<SDKElement>): SDKElement | null
+```
+
+说明：
+
+- `updateElement` 采用 patch 语义
+- 只更新传入字段，不会清空未传字段
+
+示例：
+
+```js
+const next = editor.updateElement('paragraph-123', {
+  data: {
+    text: '这段文字已被更新'
+  }
+})
+```
+
+更新图片：
+
+```js
+editor.updateElement('image-123', {
+  data: {
+    url: 'https://picsum.photos/800/400'
+  }
+})
+```
+
+### 4.3.6 SDKElement 数据结构
+
+```ts
+type SDKElement = {
+  id?: string
+  type: 'paragraph' | 'heading' | 'image' | 'attachment' | 'divider' | 'bulletList' | 'orderedList'
+  data?: Record<string, any>
+  style?: Record<string, any>
+  meta?: Record<string, any>
+}
+```
+
+示例：
+
+```js
+{
+  id: 'heading-001',
+  type: 'heading',
+  data: {
+    level: 2,
+    text: '企业级 SDK 设计'
+  },
+  style: {}
+}
+```
+
+### 4.3.7 常见元素示例
+
+段落：
+
+```js
+editor.insert({
+  type: 'paragraph',
+  data: {
+    text: '这是一个段落'
+  }
+})
+```
+
+标题：
+
+```js
+editor.insert({
+  type: 'heading',
+  data: {
+    level: 2,
+    text: '这是一个二级标题'
+  }
+})
+```
+
+无序列表：
+
+```js
+editor.insert({
+  type: 'bulletList',
+  data: {
+    items: [
+      '第一项',
+      '第二项',
+      '第三项'
+    ]
+  }
+})
+```
+
+附件：
+
+```js
+editor.insert({
+  type: 'attachment',
+  data: {
+    url: 'https://example.com/demo.pdf',
+    name: '演示附件.pdf',
+    size: '245 KB',
+    fileType: 'application/pdf'
+  }
+})
+```
+
+分割线：
+
+```js
+editor.insert({
+  type: 'divider'
+})
+```
+
+### 4.3.8 导入文件
+
+```ts
+importFile(type: 'docx' | 'md' | 'html' | 'json', file: File, options?: {
+  mode?: 'replace' | 'append' | 'insert'
+  index?: number
+  docxEngine?: 'docx4js' | 'mammoth'
+}): Promise<SDKImportResult>
+```
+
+说明：
+
+- 默认 `mode = 'replace'`
+- `append` 会把导入内容追加到文末
+- `insert` 会把导入内容插入到指定顶层位置
+
+示例：
+
+```js
+const file = input.files[0]
+
+await editor.importFile('md', file, {
+  mode: 'replace'
+})
+```
+
+追加导入：
+
+```js
+await editor.importFile('json', file, {
+  mode: 'append'
+})
+```
+
+插入导入：
+
+```js
+await editor.importFile('html', file, {
+  mode: 'insert',
+  index: 2
+})
+```
+
+### 4.3.9 导出文件
+
+```ts
+exportFile(type: 'docx' | 'pdf' | 'md' | 'json' | 'html', options?: {
+  autoDownload?: boolean
+  filename?: string
+}): Promise<Blob | boolean>
+```
+
+说明：
+
+- `autoDownload = true` 时自动下载，返回 `true`
+- `autoDownload = false` 时返回 `Blob`
+
+示例：
+
+```js
+await editor.exportFile('md', {
+  filename: 'demo.md'
+})
+```
+
+返回 Blob：
+
+```js
+const blob = await editor.exportFile('pdf', {
+  autoDownload: false,
+  filename: 'demo.pdf'
+})
+
+console.log(blob.size)
+```
+
+兼容别名：
+
+```js
+await editor.import('docx', file)
+await editor.export('html', { autoDownload: true })
+```
+
+## 4.4 实例 API 使用示例
+
+```js
+const editor = new Jitword({
+  hold: 'col-editor',
+  enableCollaboration: true,
+  currentDocumentId: 'demo-doc-001',
+  wsServer: 'wss://your-domain.com/ws'
+})
+
+const inserted = editor.insert({
+  type: 'paragraph',
+  data: { text: 'SDK 已成功接入' }
+})
+
+const element = editor.getElementById(inserted.id)
+
+editor.updateElement(inserted.id, {
+  data: { text: 'SDK 已成功接入，并完成更新' }
+})
+
+editor.deleteElementById(inserted.id)
+```
+
+## 4.5 返回值与错误约定
+
+- `getElementById`
+  - 找不到时返回 `null`
+- `deleteElementById`
+  - 删除成功返回 `true`
+  - 找不到时返回 `false`
+- `insert` / `updateElement`
+  - 失败时抛出异常
+
+常见错误场景：
+
+- 编辑器尚未 ready
+- 当前实例为只读模式
+- 传入了不支持的元素类型
+- 元素结构与目标节点 schema 不匹配
+- 编辑已有文档时：使用 `value`。
+- 新建文档时：使用 `defaultValue` 设置模板或欢迎语。
 
 #### 支持的数据格式：
 
@@ -301,183 +622,49 @@ server {
 <p>正文内容...</p>
 ```
 
-### 4.3 Jitword 实例方法
+## 4.6 其他 Jitword 实例方法
 
 `Jitword` 实例提供以下方法供外部调用：
 
-#### 4.3.1 编辑器基础方法
-
 | 方法名 | 参数 | 返回值 | 说明 |
 | :--- | :--- | :--- | :--- |
-| `getJData()` / `getJSON()` | - | `object` | 获取文档 JSON 格式数据 |
-| `getHtml()` / `getHTML()` | - | `string` | 获取文档 HTML 格式数据 |
-| `setData(data)` / `setContent(data)` | `object \| string` | `void` | 设置文档内容（JSON 或 HTML） |
+| `getJData()` | - | `object` | 获取文档 JSON 格式数据 |
+| `getHtml()` | - | `string` | 获取文档 HTML 格式数据 |
+| `setData(data)` | `object \| string` | `void` | 设置文档内容（JSON 或 HTML） |
 | `setEditable(editable)` | `boolean` | `void` | 设置编辑器是否可编辑 |
 | `getEditor()` | - | `Editor` | 获取底层 TipTap Editor 实例 |
 | `setCurrentDocumentId(docId)` | `string` | `void` | 切换当前文档 ID（触发协同房间切换） |
 | `destroy()` | - | `void` | 销毁编辑器实例 |
 
-#### 4.3.2 文档管理方法（离线模式）
-
-| 方法名 | 参数 | 返回值 | 说明 |
-| :--- | :--- | :--- | :--- |
-| `getDocument(docId)` | `string` | `Promise<Document>` | 获取指定文档 |
-| `getDocuments(filter)` | `'all'\|'active'\|'deleted'` | `Promise<Document[]>` | 获取文档列表 |
-| `createDocument(name)` | `string` | `Promise<Document>` | 创建新文档并切换 |
-| `saveDocument(docId, content)` | `string, object` | `Promise<Document>` | 保存文档内容 |
-| `updateDocumentMetadata(docId, metadata)` | `string, object` | `Promise<Document>` | 更新文档元数据 |
-| `exportData()` | - | `Promise<string>` | 导出所有离线数据（JSON） |
-| `getStorageStats()` | - | `Promise<Stats>` | 获取存储统计信息 |
-| `clearStorage()` | - | `Promise<void>` | 清空所有离线数据（⚠️不可恢复） |
-
-#### 4.3.3 评论管理方法
-
-> ✨ **新增实例 API** - 自动使用 `currentDocumentId`，无需手动传参
-
-| 方法名 | 参数 | 返回值 | 说明 |
-| :--- | :--- | :--- | :--- |
-| `getComments()` | - | `Promise<Comment[]>` | 获取当前文档的所有评论 |
-| `createComment(data)` | `{ id, content, targetText? }` | `Promise<Comment>` | 创建新评论 |
-| `updateComment(commentId, content)` | `string, string` | `Promise<Comment>` | 更新评论内容 |
-| `deleteComment(commentId)` | `string` | `Promise<void>` | 删除评论 |
-
-#### 4.3.4 版本管理方法
-
-> ✨ **新增实例 API** - 自动使用 `currentDocumentId`，简化版本管理
-
-| 方法名 | 参数 | 返回值 | 说明 |
-| :--- | :--- | :--- | :--- |
-| `getVersions(page?, limit?)` | `number, number` | `Promise<{versions, total}>` | 获取版本历史列表（默认前20条） |
-| `createVersion(data)` | `{ content, title?, description?, isAutoSave?, author? }` | `Promise<Version>` | 创建版本快照 |
-| `getVersion(versionId)` | `string` | `Promise<Version>` | 获取指定版本详情 |
-| `updateVersion(versionId, data)` | `string, { title?, description? }` | `Promise<Version>` | 更新版本元数据 |
-| `deleteVersion(versionId)` | `string` | `Promise<void>` | 删除版本 |
-| `restoreVersion(versionId)` | `string` | `Promise<void>` | 恢复版本（✅ 协同模式下自动处理 Yjs 同步） |
-| `compareVersions(v1, v2)` | `string, string` | `Promise<any>` | 对比两个版本 |
-
-#### 4.3.5 页面设置方法
-
-> ✨ **新增实例 API** - 快速管理当前文档的页面布局
-
-| 方法名 | 参数 | 返回值 | 说明 |
-| :--- | :--- | :--- | :--- |
-| `updatePageSettings(settings)` | `{ pageSize?, orientation?, margins? }` | `Promise<void>` | 更新页面设置 |
-| `getPageSettings()` | - | `Promise<PageSettings>` | 获取当前页面设置 |
-
 **使用示例：**
 
 ```javascript
-const editor = new Jitword({ 
-  hold: 'editor-container',
-  currentDocumentId: 'doc-123',  // ✅ 设置当前文档 ID
-  offlineMode: true  // 启用离线模式使用完整 API
-});
+const editor = new Jitword({ hold: 'editor-container' });
 
-// ===== 编辑器基础操作 =====
 // 获取内容
-const json = editor.getJSON();
-const html = editor.getHTML();
+const json = editor.getJData();
+const html = editor.getHtml();
 
 // 设置内容
-editor.setContent({ type: 'doc', content: [...] });
-editor.setContent('<p>Hello World</p>');
+editor.setData({ type: 'doc', content: [...] });
+editor.setData('<p>Hello World</p>');
 
 // 切换可编辑状态
 editor.setEditable(false); // 只读
 editor.setEditable(true);  // 可编辑
 
-// ===== 文档管理（离线模式）=====
-// 获取文档列表
-const docs = await editor.getDocuments('all');
-console.log('文档列表:', docs);
-
-// 创建新文档（自动切换到新文档）
-const newDoc = await editor.createDocument('我的新文档');
-console.log('新文档 ID:', newDoc.id);
-
-// 保存文档
-await editor.saveDocument('doc-123', editor.getJSON());
-
-// 导出所有数据
-const data = await editor.exportData();
-console.log('导出数据:', data);
-
-// 获取存储统计
-const stats = await editor.getStorageStats();
-console.log('存储统计:', stats);
-
-// ===== 评论管理（NEW）=====
-// ✅ 自动使用 currentDocumentId，无需传入 documentId
-const comments = await editor.getComments();
-
-// 创建评论
-await editor.createComment({
-  id: 'comment-' + Date.now(),
-  content: '这里需要修改',
-  targetText: '选中的文本'
-});
-
-// 更新评论
-await editor.updateComment('comment-123', '更新后的内容');
-
-// 删除评论
-await editor.deleteComment('comment-123');
-
-// ===== 版本管理（NEW）=====
-// ✅ 自动使用 currentDocumentId
-const { versions, total } = await editor.getVersions(1, 20);
-
-// 创建版本快照
-await editor.createVersion({
-  content: editor.getJSON(),
-  title: 'v1.0 正式版',
-  description: '第一个稳定版本',
-  isAutoSave: false,
-  author: '张三'
-});
-
-// 获取指定版本
-const version = await editor.getVersion('version-123');
-
-// 更新版本信息
-await editor.updateVersion('version-123', {
-  title: 'v1.0.1',
-  description: '修复版本'
-});
-
-// 恢复版本（✅ 协同模式下自动处理 Yjs 同步）
-await editor.restoreVersion('version-123');
-
-// 删除版本
-await editor.deleteVersion('version-123');
-
-// 对比两个版本
-const diff = await editor.compareVersions('version-1', 'version-2');
-
-// ===== 页面设置（NEW）=====
-// ✅ 自动使用 currentDocumentId
-await editor.updatePageSettings({
-  pageSize: 'A4',
-  orientation: 'portrait',
-  margins: { top: 72, right: 72, bottom: 72, left: 72 }
-});
-
-// 获取当前页面设置
-const settings = await editor.getPageSettings();
-
-// ===== 其他操作 =====
-// 切换文档（协同模式下会重建 Yjs 环境）
+// 切换文档
 editor.setCurrentDocumentId('new-doc-id');
 
 // 销毁实例
 editor.destroy();
 ```
 
-### 4.4 JitWordSDK REST API
+## 4.7 JitWordSDK REST API
 
 `JitWordSDK` 提供完整的后端 REST API 调用方法。
 
-#### 4.4.1 初始化 SDK
+### 4.7.1 初始化 SDK
 
 ```javascript
 const { JitWordSDK } = window.PxEditor;
@@ -489,7 +676,7 @@ JitWordSDK.init({
 });
 ```
 
-#### 4.4.2 认证 API
+### 4.7.2 认证 API
 
 | 方法 | 参数 | 返回值 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -498,7 +685,7 @@ JitWordSDK.init({
 | `JitWordSDK.auth.setToken(token)` | `string` | `void` | 手动设置认证 token |
 | `JitWordSDK.auth.getToken()` | - | `string` | 获取当前 token |
 
-#### 4.4.3 文档 API
+### 4.7.3 文档 API
 
 | 方法 | 参数 | 说明 |
 | :--- | :--- | :--- |
@@ -526,7 +713,7 @@ const newDoc = await JitWordSDK.documents.create('我的新文档');
 await JitWordSDK.documents.updatePermission(docId, 'read');
 ```
 
-#### 4.4.4 评论 API
+### 4.7.4 评论 API
 
 | 方法 | 参数 | 说明 |
 | :--- | :--- | :--- |
@@ -550,7 +737,7 @@ await JitWordSDK.comments.create({
 });
 ```
 
-#### 4.4.5 版本 API
+### 4.7.5 版本 API
 
 | 方法 | 参数 | 说明 |
 | :--- | :--- | :--- |
@@ -561,120 +748,20 @@ await JitWordSDK.comments.create({
 | `versions.update(docId, versionId, data)` | `string, string, { title?, description? }` | 更新版本信息 |
 | `versions.compare(docId, v1, v2)` | `string, string, string` | 对比两个版本 |
 
-#### 4.4.6 AI API
+### 4.7.6 AI API
 
 | 方法 | 参数 | 说明 |
 | :--- | :--- | :--- |
 | `ai.trialStats(uid?, role?)` | `string?, string?` | 获取 AI 试用统计 |
 | `ai.streamTrial(args, onDelta)` | `object, function` | AI 流式生成（试用版） |
 
-#### 4.4.7 文件上传 API
+### 4.7.7 文件上传 API
 
 | 方法 | 参数 | 说明 |
 | :--- | :--- | :--- |
 | `files.uploadApi(file)` | `File \| FormData` | 上传文件 |
 | `files.uploadDoc(data)` | `FormData \| object` | 上传 Word 文档解析 |
 | `files.uploadPdf(data)` | `FormData \| object` | 上传 PDF 文档解析 |
-
-### 4.5 实例 API vs 静态 SDK API
-
-> ✅ **新增：实例 API**（推荐）- 自动绑定 `currentDocumentId`，更简洁、更直观
-
-SDK 提供两种 API 调用方式：
-
-#### 4.5.1 实例 API（推荐）
-
-**适用场景**：当前文档上下文中的操作
-
-```javascript
-const editor = new Jitword({
-  hold: '#app',
-  currentDocumentId: 'doc-123',  // ✅ 设置当前文档 ID
-  offlineMode: true
-});
-
-// ✅ 优点：自动使用 currentDocumentId，无需重复传参
-const comments = await editor.getComments();  // 自动使用 doc-123
-const versions = await editor.getVersions();  // 自动使用 doc-123
-await editor.updatePageSettings({ ... });     // 自动使用 doc-123
-```
-
-**可用实例 API**：
-- 📝 **编辑器操作**：`getJSON()`, `setContent()`, `setEditable()`, `getEditor()`
-- 📂 **文档管理**：`getDocuments()`, `createDocument()`, `saveDocument()`, `exportData()`
-- 💬 **评论管理**：`getComments()`, `createComment()`, `updateComment()`, `deleteComment()`
-- 🕙 **版本管理**：`getVersions()`, `createVersion()`, `restoreVersion()`, `deleteVersion()`
-- 📊 **页面设置**：`updatePageSettings()`, `getPageSettings()`
-
-#### 4.5.2 静态 SDK API（全局访问）
-
-**适用场景**：全局操作、后台任务、多文档操作
-
-```javascript
-import { JitWordSDK } from '@jitword/collab-editor';
-// 或在浏览器中：const { JitWordSDK } = window.PxEditor;
-
-JitWordSDK.init({
-  baseUrl: 'https://your-api.com/api/v1',
-  offlineMode: false
-});
-
-// ❌ 需要显式传入 documentId
-const comments = await JitWordSDK.comments.list('doc-123');
-const versions = await JitWordSDK.versions.list('doc-456', 1, 20);
-await JitWordSDK.documents.updatePageSettings('doc-789', settings);
-```
-
-**可用静态 API**：
-- 🔑 **认证**：`auth.login()`, `auth.register()`, `auth.setToken()`
-- 📂 **文档**：`documents.list()`, `documents.create()`, `documents.get()`, `documents.rename()`
-- 💬 **评论**：`comments.list(docId)`, `comments.create(data)`, `comments.update()`, `comments.delete()`
-- 🕙 **版本**：`versions.list(docId)`, `versions.create(docId, data)`, `versions.compare()`
-- 🤖 **AI**：`ai.trialStats()`, `ai.streamTrial()`
-- 📄 **文件**：`files.uploadApi()`, `files.uploadDoc()`, `files.uploadPdf()`
-
-#### 4.5.3 对比总结
-
-| 特性 | 实例 API | 静态 SDK API |
-|------|------------|----------------|
-| **调用方式** | `editor.getComments()` | `JitWordSDK.comments.list(docId)` |
-| **documentId** | ✅ 自动绑定 | ❌ 需显式传入 |
-| **代码简洁度** | ✅ 更简洁 | ❌ 较冗余 |
-| **适用场景** | 当前文档操作 | 全局/多文档操作 |
-| **类型安全** | ✅ TypeScript 支持 | ✅ TypeScript 支持 |
-
-**推荐做法**：
-- ✅ 优先使用**实例 API**（`editor.xxx()`）进行当前文档操作
-- ✅ 仅在需要全局访问或多文档操作时使用**静态 SDK API**
-- ✅ 两种 API 可以混用，根据实际场景选择
-
-**实际示例**：
-
-```javascript
-// 场景 1：当前文档的评论管理（✅ 使用实例 API）
-const editor = new Jitword({ hold: '#app', currentDocumentId: 'doc-123' });
-
-// 简洁、直观
-const comments = await editor.getComments();
-await editor.createComment({ id: 'c1', content: 'Good!' });
-
-// 场景 2：获取多个文档的评论（✅ 使用静态 SDK）
-const doc1Comments = await JitWordSDK.comments.list('doc-123');
-const doc2Comments = await JitWordSDK.comments.list('doc-456');
-const doc3Comments = await JitWordSDK.comments.list('doc-789');
-
-// 场景 3：混合使用（✅ 根据场景选择）
-const editor = new Jitword({ hold: '#app', currentDocumentId: 'doc-123' });
-
-// 当前文档操作使用实例 API
-await editor.createVersion({ content: editor.getJSON(), title: 'v1.0' });
-
-// 全局认证使用静态 SDK
-await JitWordSDK.auth.login('user', 'pass');
-
-// 多文档查询使用静态 SDK
-const allDocs = await JitWordSDK.documents.list({ filter: 'all' });
-```
 
 ## 5. 后端 API 路由定义
 
@@ -769,9 +856,7 @@ const allDocs = await JitWordSDK.documents.list({ filter: 'all' });
 - `404`: 资源不存在
 - `500`: 服务器内部错误
 
-## 6. 完整示例
-
-### 6.1 在线模式示例 (standalone.html)
+## 6. 完整示例 (standalone.html)
 
 ```html
 <!DOCTYPE html>
@@ -838,6 +923,8 @@ const allDocs = await JitWordSDK.documents.list({ filter: 'all' });
         wsServer: 'wss://your-collab-server.com/ws',
         
         // 数据与回调
+        defaultValue: { type: 'doc', content: [] },
+        
         onSave: ({ content }) => {
           console.log('文档保存:', content);
           Message.success('保存成功');
@@ -862,381 +949,3 @@ const allDocs = await JitWordSDK.documents.list({ filter: 'all' });
 </html>
 ```
 
-### 6.2 离线模式示例（混合模式：API + 内置 UI）
-
-离线模式允许您在无需后端 API 的情况下体验 SDK 功能，所有数据存储在浏览器 IndexedDB 中。
-
-#### 设计理念
-
-本示例采用**混合模式**：
-- ✅ **文档管理**：通过顶部 API 按钮展示编程能力（API-First 设计）
-- ✅ **其他功能**：使用内置 UI（版本管理、AI 助手等）提供良好体验
-- ✅ **灵活配置**：用户可根据需求自由开启/关闭功能
-
-#### 完整示例
-
-```html
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JitWord - 离线模式演示</title>
-  
-  <!-- SDK 样式和依赖库 -->
-  <link rel="stylesheet" href="cdn/arco.css">
-  <link rel="stylesheet" href="cdn/px-editor.css">
-  <script src="cdn/vue.global.prod.js"></script>
-  <script src="cdn/arco-vue.min.js"></script>
-  <script src="cdn/arco-vue-icon.min.js"></script>
-  <script src="cdn/echarts.min.js"></script>
-  <script src="cdn/mind-elixir.js"></script>
-  <script src="cdn/px-editor.standalone.js"></script>
-
-  <style>
-    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; }
-    #app { width: 100%; height: 100vh; display: flex; flex-direction: column; }
-    
-    /* API 演示面板 */
-    .api-demo-panel {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-    }
-    .api-btn {
-      background: rgba(255,255,255,0.2);
-      border: 1px solid rgba(255,255,255,0.3);
-      color: white;
-      padding: 6px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: all 0.2s;
-    }
-    .api-btn:hover { background: rgba(255,255,255,0.3); }
-    #col-editor { flex: 1; }
-  </style>
-</head>
-<body>
-  <div id="app">
-    <!-- ✅ API 演示面板：展示 SDK API 能力 -->
-    <div class="api-demo-panel">
-      <div>
-        <strong>离线模式演示</strong>
-        <small>混合模式：文档管理 API + 其他内置功能体验</small>
-      </div>
-      <div>
-        <button class="api-btn" onclick="listDocuments()">📂 文档列表</button>
-        <button class="api-btn" onclick="createNewDocument()">➕ 创建文档</button>
-        <button class="api-btn" onclick="setDocumentContent()">📝 设置内容</button>
-        <button class="api-btn" onclick="getDocumentContent()">📖 获取内容</button>
-        <button class="api-btn" onclick="exportData()">📤 导出数据</button>
-        <button class="api-btn" onclick="showStats()">📊 存储统计</button>
-        <button class="api-btn" onclick="clearData()">🗑️ 清空数据</button>
-      </div>
-    </div>
-    <div id="col-editor"></div>
-  </div>
-
-  <script>
-    window.onload = function() {
-      if (!window.PxEditor) {
-        console.error('PxEditor SDK 加载失败');
-        return;
-      }
-
-      const { Jitword, Message } = window.PxEditor;
-
-      // 获取或生成文档 ID
-      const getDocId = () => {
-        const params = new URLSearchParams(window.location.search);
-        let docId = params.get('docId');
-        if (!docId) {
-          docId = 'offline-doc-' + Date.now();
-          const newUrl = window.location.pathname + '?docId=' + docId;
-          window.history.replaceState({}, '', newUrl);
-        }
-        return docId;
-      };
-      
-      const currentDocId = getDocId();
-      
-      // ===== 初始化编辑器（离线模式）=====
-      const editor = new Jitword({
-        // 必需配置
-        hold: "col-editor",
-        currentDocumentId: currentDocId,
-        
-        // 离线模式核心配置
-        offlineMode: true,
-        offlineStorageKey: 'jitword_offline_demo',
-        enableCollaboration: false,  // 离线模式必须关闭协同
-        
-        // 应用信息
-        appTitle: 'JitWord 离线演示',
-        locale: 'zh',
-        placeholder: '开始输入内容...',
-        
-        // ✅ 功能配置：隐藏内置文档管理 UI，改用 API 演示
-        enableDocumentList: false,     // 隐藏内置文档列表
-        enableCreateDocument: false,   // 隐藏内置创建按钮
-        useBuiltinModals: true,        // 保留其他内置 UI（版本、AI 等）
-        
-        // 事件回调
-        onSave: async ({ content, currentDocumentId }) => {
-          console.log('💾 保存文档:', currentDocumentId);
-          try {
-            await editor.saveDocument(currentDocumentId, content);
-            Message.success('✅ 文档已保存到本地存储');
-          } catch (error) {
-            console.error('❌ 保存失败:', error);
-            Message.error('保存失败: ' + error.message);
-          }
-        },
-        
-        onEditorReady: async (editorInstance) => {
-          console.log('✅ 编辑器就绪');
-          
-          // 检查并创建文档
-          try {
-            let doc = await editor.getDocument(currentDocId);
-            if (!doc) {
-              await editor.updateDocumentMetadata(currentDocId, {
-                id: currentDocId,
-                name: '离线文档示例',
-                content: editorInstance.getJSON(),
-                createdAt: Date.now(),
-                updatedAt: Date.now()
-              });
-              console.log('✅ 初始文档创建成功');
-            }
-          } catch (error) {
-            console.error('❌ 初始化文档失败:', error);
-          }
-        }
-      });
-      
-      // 暴露实例供 API 演示使用
-      window.editor = editor;
-      window.JitWordMessage = Message;
-      window.currentDocId = currentDocId;
-    };
-
-    // ===== API 演示函数 =====
-    
-    /**
-     * 📂 获取文档列表
-     */
-    async function listDocuments() {
-      const editor = window.editor;
-      if (!editor) {
-        window.JitWordMessage.error('编辑器未初始化');
-        return;
-      }
-      
-      try {
-        const docs = await editor.getDocuments('all');
-        console.log('✅ Documents:', docs);
-        
-        if (docs.length === 0) {
-          window.JitWordMessage.info('暂无文档');
-          return;
-        }
-        
-        const docList = docs.map((doc, i) => {
-          const time = new Date(doc.updatedAt).toLocaleString('zh-CN');
-          const current = doc.id === window.currentDocId ? ' ✅ (当前)' : '';
-          return `${i + 1}. ${doc.name}${current}\n   更新: ${time}`;
-        }).join('\n\n');
-        
-        alert(`📂 离线文档列表 (共 ${docs.length} 个)
-
-${docList}
-
-💡 API: await editor.getDocuments('all')`);
-        window.JitWordMessage.success(`✅ 已获取 ${docs.length} 个文档`);
-      } catch (error) {
-        console.error('❌ 获取失败:', error);
-        window.JitWordMessage.error('获取失败: ' + error.message);
-      }
-    }
-    
-    /**
-     * ➕ 创建新文档
-     */
-    async function createNewDocument() {
-      const editor = window.editor;
-      if (!editor) return;
-      
-      const name = prompt('请输入文档名称:', '新建文档 ' + new Date().toLocaleTimeString('zh-CN'));
-      if (!name) return;
-      
-      try {
-        const newDoc = await editor.createDocument(name);
-        console.log('✅ Document created:', newDoc);
-        window.currentDocId = newDoc.id;
-        window.JitWordMessage.success(`✅ 文档「${name}」已创建并切换`);
-      } catch (error) {
-        console.error('❌ 创建失败:', error);
-        window.JitWordMessage.error('创建失败: ' + error.message);
-      }
-    }
-    
-    /**
-     * 📝 设置文档内容
-     */
-    function setDocumentContent() {
-      const editor = window.editor;
-      if (!editor) return;
-      
-      const newContent = {
-        type: 'doc',
-        content: [
-          {
-            type: 'heading',
-            attrs: { level: 1 },
-            content: [{ type: 'text', text: '通过 API 设置的内容' }]
-          },
-          {
-            type: 'paragraph',
-            content: [{ 
-              type: 'text', 
-              text: 'API 调用时间：' + new Date().toLocaleString('zh-CN')
-            }]
-          }
-        ]
-      };
-      
-      editor.setContent(newContent);
-      console.log('✅ Content set via editor.setContent()');
-      window.JitWordMessage.success('✅ 内容已设置');
-    }
-    
-    /**
-     * 📖 获取文档内容
-     */
-    function getDocumentContent() {
-      const editor = window.editor;
-      if (!editor) return;
-      
-      const content = editor.getJSON();
-      console.log('✅ Content:', content);
-      
-      const contentStr = JSON.stringify(content, null, 2);
-      const preview = contentStr.substring(0, 500) + (contentStr.length > 500 ? '...' : '');
-      alert(`📝 文档内容
-
-大小: ${contentStr.length} 字符
-节点: ${content.content?.length || 0} 个
-
-预览:
-${preview}`);
-      window.JitWordMessage.success('✅ 已获取内容');
-    }
-    
-    /**
-     * 📤 导出数据
-     */
-    async function exportData() {
-      const editor = window.editor;
-      if (!editor) return;
-      
-      try {
-        const data = await editor.exportData();
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `jitword-backup-${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        
-        console.log('✅ Data exported');
-        window.JitWordMessage.success('✅ 数据已导出');
-      } catch (error) {
-        console.error('❌ 导出失败:', error);
-        window.JitWordMessage.error('导出失败: ' + error.message);
-      }
-    }
-    
-    /**
-     * 📊 存储统计
-     */
-    async function showStats() {
-      const editor = window.editor;
-      if (!editor) return;
-      
-      try {
-        const stats = await editor.getStorageStats();
-        console.log('✅ Stats:', stats);
-        
-        const msg = `📊 存储统计
-
-文档:
-  总数: ${stats.total}
-  活动: ${stats.active}
-  已删除: ${stats.deleted}
-
-存储大小: ${stats.size}`;
-        alert(msg);
-        window.JitWordMessage.success('✅ 已获取统计');
-      } catch (error) {
-        console.error('❌ 获取失败:', error);
-        window.JitWordMessage.error('获取失败: ' + error.message);
-      }
-    }
-    
-    /**
-     * 🗑️ 清空数据
-     */
-    async function clearData() {
-      if (!confirm('确定要清空所有数据吗？此操作不可恢复！')) return;
-      
-      const editor = window.editor;
-      if (!editor) return;
-      
-      try {
-        await editor.clearStorage();
-        console.log('✅ Storage cleared');
-        window.JitWordMessage.success('✅ 数据已清空，即将刷新页面');
-        setTimeout(() => location.reload(), 1500);
-      } catch (error) {
-        console.error('❌ 清空失败:', error);
-        window.JitWordMessage.error('清空失败: ' + error.message);
-      }
-    }
-  </script>
-</body>
-</html>
-```
-
-#### 离线模式功能限制
-
-- ✅ **支持**: 文档 CRUD、评论管理、版本快照、内容编辑
-- ❌ **不支持**: 实时协同、在线用户、WebSocket 连接、跨设备同步
-- ⚠️ **存储限制**: localStorage 容量限制约 5-10MB，大文档可能需要优化
-
-#### 离线数据管理
-
-```javascript
-// 获取离线存储实例
-const storage = JitWordSDK.getOfflineStorage();
-
-// 导出数据（JSON 格式）
-const exportedData = storage.exportData();
-console.log(exportedData);
-
-// 导入数据
-const success = storage.importData(jsonString);
-
-// 清空所有数据
-storage.clear();
-
-// 查看存储大小
-console.log('当前存储大小:', storage.getStorageSize());
-
-```

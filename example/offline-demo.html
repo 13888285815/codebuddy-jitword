@@ -319,15 +319,20 @@
         <div class="panel-icon">[SDK]</div>
         <div class="panel-text">
           <strong>JitWord 在线演示</strong>
-          <small>协同模式：文档 API + 实时协作体验</small>
+          <small>协同模式：第一阶段元素 API + 实时协作体验</small>
         </div>
       </div>
       <div class="panel-right">
         <button class="api-btn" onclick="apiSetContent()">设置内容</button>
-        <button class="api-btn" onclick="apiLoadEmpty()">加载空文档</button>
+        <button class="api-btn" onclick="apiInsertParagraph()">插入段落</button>
+        <button class="api-btn" onclick="apiInsertImage()">插入图片</button>
+        <button class="api-btn" onclick="apiGetLastElement()">查询最近元素</button>
+        <button class="api-btn" onclick="apiUpdateLastElement()">更新最近元素</button>
+        <button class="api-btn" onclick="apiDeleteLastElement()">删除最近元素</button>
+        <button class="api-btn" onclick="apiChooseImportFile()">导入文件</button>
+        <button class="api-btn" onclick="apiExportMarkdown()">导出 Markdown</button>
+        <button class="api-btn" onclick="apiExportPdfBlob()">导出 PDF Blob</button>
         <button class="api-btn" onclick="apiGetContent()">获取内容</button>
-        <button class="api-btn" onclick="apiNewDoc()">新建文档</button>
-        <button class="api-btn" onclick="apiExportJSON()">导出 JSON</button>
       </div>
     </div>
 
@@ -339,6 +344,7 @@
     </div>
     
     <div class="editor-wrapper" id="editor-container"></div>
+    <input id="sdk-import-file" type="file" style="display:none" accept=".docx,.md,.markdown,.html,.htm,.json" />
   </div>
 
   <script>
@@ -543,6 +549,7 @@
           // Expose globally for API demo panel
           window.editor = editor;
           window.JitWordMessage = Message;
+          window.__lastSdkElementId = null;
         }
         
       });
@@ -672,18 +679,46 @@
     }
 
     /**
-     * 加载空文档
+     * 插入段落元素 - 演示 insert() API
      */
-    function apiLoadEmpty() {
+    function apiInsertParagraph() {
       const inst = window.editor;
       const msg = window.JitWordMessage;
       if (!inst) { alert('编辑器未初始化'); return; }
-      if (inst.setContent) {
-        inst.setContent({ type: 'doc', content: [] });
-        if (msg) msg.info('已加载空文档');
-      } else {
-        if (msg) msg.error('方法不可用');
+      if (!inst.insert) {
+        if (msg) msg.error('insert() 方法不可用');
+        return;
       }
+      const inserted = inst.insert({
+        type: 'paragraph',
+        data: {
+          text: '这是一段通过 insert() 插入的内容，时间：' + new Date().toLocaleString('zh-CN')
+        }
+      });
+      window.__lastSdkElementId = inserted && inserted.id;
+      if (msg) msg.success('已插入段落元素：' + (window.__lastSdkElementId || 'unknown'));
+    }
+
+    /**
+     * 插入图片元素 - 演示 insert() API
+     */
+    function apiInsertImage() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst) { alert('编辑器未初始化'); return; }
+      if (!inst.insert) {
+        if (msg) msg.error('insert() 方法不可用');
+        return;
+      }
+      const inserted = inst.insert({
+        type: 'image',
+        data: {
+          url: 'https://picsum.photos/seed/jitword-sdk/720/360',
+          alt: 'JitWord SDK 示例图片'
+        }
+      });
+      window.__lastSdkElementId = inserted && inserted.id;
+      if (msg) msg.success('已插入图片元素：' + (window.__lastSdkElementId || 'unknown'));
     }
 
     /**
@@ -713,49 +748,170 @@ ${contentStr.substring(0, 500)}${contentStr.length > 500 ? '...' : ''}`;
     }
 
     /**
-     * 新建文档 - 演示 setCurrentDocumentId() API
+     * 查询最近一次插入的元素 - 演示 getElementById() API
      */
-    function apiNewDoc() {
+    function apiGetLastElement() {
       const inst = window.editor;
       const msg = window.JitWordMessage;
       if (!inst) { alert('编辑器未初始化'); return; }
-      const newDocId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-      const url = new URL(window.location.href);
-      url.searchParams.set('docId', newDocId);
-      window.history.pushState({}, '', url.toString());
-      if (inst.setCurrentDocumentId) {
-        inst.setCurrentDocumentId(newDocId);
-        if (msg) msg.success('已新建文档：' + newDocId.substring(0, 8) + '...');
+      if (!window.__lastSdkElementId) {
+        if (msg) msg.warning('请先插入一个元素');
+        return;
+      }
+      if (!inst.getElementById) {
+        if (msg) msg.error('getElementById() 方法不可用');
+        return;
+      }
+      const element = inst.getElementById(window.__lastSdkElementId);
+      alert(JSON.stringify(element, null, 2));
+      if (msg) msg.success('已查询最近插入元素');
+    }
+
+    /**
+     * 更新最近插入的元素 - 演示 updateElement() API
+     */
+    function apiUpdateLastElement() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst) { alert('编辑器未初始化'); return; }
+      if (!window.__lastSdkElementId) {
+        if (msg) msg.warning('请先插入一个元素');
+        return;
+      }
+      if (!inst.updateElement) {
+        if (msg) msg.error('updateElement() 方法不可用');
+        return;
+      }
+      const current = inst.getElementById ? inst.getElementById(window.__lastSdkElementId) : null;
+      if (!current) {
+        if (msg) msg.error('最近元素不存在，可能已被删除');
+        return;
+      }
+      const patch = current.type === 'image'
+        ? {
+            data: {
+              url: 'https://picsum.photos/seed/jitword-sdk-updated/720/360',
+              alt: 'JitWord SDK 更新后的图片'
+            }
+          }
+        : {
+            data: {
+              text: '这段内容已经通过 updateElement() 更新，时间：' + new Date().toLocaleString('zh-CN')
+            }
+          };
+      const updated = inst.updateElement(window.__lastSdkElementId, patch);
+      if (updated && updated.id) {
+        window.__lastSdkElementId = updated.id;
+      }
+      if (msg) msg.success('已更新最近插入元素');
+    }
+
+    /**
+     * 删除最近插入的元素 - 演示 deleteElementById() API
+     */
+    function apiDeleteLastElement() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst) { alert('编辑器未初始化'); return; }
+      if (!window.__lastSdkElementId) {
+        if (msg) msg.warning('请先插入一个元素');
+        return;
+      }
+      if (!inst.deleteElementById) {
+        if (msg) msg.error('deleteElementById() 方法不可用');
+        return;
+      }
+      const ok = inst.deleteElementById(window.__lastSdkElementId);
+      if (ok) {
+        if (msg) msg.success('已删除元素：' + window.__lastSdkElementId);
+        window.__lastSdkElementId = null;
       } else {
-        if (msg) msg.error('方法不可用');
+        if (msg) msg.error('删除失败，元素可能不存在');
       }
     }
 
     /**
-     * 导出 JSON - 将当前文档 JSON 下载为文件
+     * 打开文件选择器 - 演示 importFile() API
      */
-    function apiExportJSON() {
+    function apiChooseImportFile() {
+      const input = document.getElementById('sdk-import-file');
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+    }
+
+    /**
+     * 导出 Markdown - 演示 exportFile() 自动下载
+     */
+    async function apiExportMarkdown() {
       const inst = window.editor;
       const msg = window.JitWordMessage;
       if (!inst) { alert('编辑器未初始化'); return; }
-      if (inst.getJSON) {
-        const content = inst.getJSON();
-        const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'jitword-doc-' + Date.now() + '.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        if (msg) msg.success('文档已导出为 JSON');
-      } else {
-        if (msg) msg.error('方法不可用');
+      if (!inst.exportFile) {
+        if (msg) msg.error('exportFile() 方法不可用');
+        return;
       }
+      await inst.exportFile('md', {
+        filename: 'jitword-sdk-demo.md'
+      });
+      if (msg) msg.success('已触发 Markdown 导出');
     }
+
+    /**
+     * 导出 PDF Blob - 演示 exportFile() 返回 Blob
+     */
+    async function apiExportPdfBlob() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst) { alert('编辑器未初始化'); return; }
+      if (!inst.exportFile) {
+        if (msg) msg.error('exportFile() 方法不可用');
+        return;
+      }
+      const blob = await inst.exportFile('pdf', {
+        autoDownload: false,
+        filename: 'jitword-sdk-demo.pdf'
+      });
+      alert('已生成 PDF Blob\\n\\n类型: ' + blob.type + '\\n大小: ' + blob.size + ' bytes');
+      if (msg) msg.success('已生成 PDF Blob');
+    }
+
+    document.getElementById('sdk-import-file').addEventListener('change', async function(event) {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      const file = event.target && event.target.files ? event.target.files[0] : null;
+      if (!inst || !file) return;
+      if (!inst.importFile) {
+        if (msg) msg.error('importFile() 方法不可用');
+        return;
+      }
+
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      const typeMap = {
+        markdown: 'md',
+        md: 'md',
+        html: 'html',
+        htm: 'html',
+        json: 'json',
+        docx: 'docx'
+      };
+      const importType = typeMap[ext];
+      if (!importType) {
+        if (msg) msg.error('不支持的导入格式: ' + ext);
+        return;
+      }
+
+      try {
+        const result = await inst.importFile(importType, file, {
+          mode: 'replace'
+        });
+        if (msg) msg.success('导入成功' + (result && result.summary ? '：' + result.summary : ''));
+      } catch (error) {
+        console.error('Import failed:', error);
+        if (msg) msg.error('导入失败: ' + (error && error.message ? error.message : '未知错误'));
+      }
+    });
 
     // Wait for window load to ensure all scripts are executed
     window.addEventListener('load', startApp);

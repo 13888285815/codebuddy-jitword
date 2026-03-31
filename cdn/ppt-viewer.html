@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPT Viewer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: transparent;
+    }
+
+    .loading, .error {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-size: 16px;
+      padding: 20px;
+    }
+
+    .loading {
+      color: #666;
+    }
+
+    .error {
+      color: #f56c6c;
+      text-align: center;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #999;
+      font-size: 14px;
+      padding: 20px;
+    }
+
+    .error-detail {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #999;
+      max-width: 600px;
+      word-break: break-all;
+    }
+
+    .ppt-container {
+      flex: 1;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    // Polyfill process before any UMD loads
+    if (typeof window.process === 'undefined') {
+      window.process = { env: { NODE_ENV: 'production' } };
+    }
+
+    // Parse PPT URL from query string immediately
+    var _pptUrl = new URLSearchParams(window.location.search).get('url') || '';
+
+    function loadScript(src, onload, onerror) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = onload;
+      s.onerror = onerror || function() {
+        console.error('[PPT Viewer] Failed to load script:', src);
+      };
+      document.head.appendChild(s);
+    }
+
+    function showError(msg) {
+      document.getElementById('app').innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f56c6c;font-size:14px;padding:20px;text-align:center;">' + msg + '</div>';
+    }
+
+    function mountApp() {
+      var Vue = window.Vue;
+      var pptxGlobal = window['vue-office-pptx'];
+
+      if (!Vue) { showError('Vue 加载失败'); return; }
+      if (!pptxGlobal) { showError('PPT预览组件加载失败'); return; }
+
+      var VueOfficePptxComp = pptxGlobal.default || pptxGlobal;
+      var createApp = Vue.createApp;
+      var h = Vue.h;
+
+      var app = createApp({
+        setup: function() {
+          function onRendered() {
+            console.log('[PPT Viewer] PPT rendered successfully');
+          }
+          function onError(err) {
+            console.error('[PPT Viewer] PPT render error:', err);
+            showError('加载PPT文件失败: ' + ((err && err.message) ? err.message : String(err)));
+          }
+
+          if (!_pptUrl) {
+            return function render() {
+              return h('div', { class: 'empty-state' }, [h('div', 'PPT文件准备中...')]);
+            };
+          }
+
+          return function render() {
+            return h('div', { class: 'ppt-container' },
+              h(VueOfficePptxComp, {
+                src: _pptUrl,
+                style: 'width:100%;height:100%;',
+                onRendered: onRendered,
+                onError: onError,
+              })
+            );
+          };
+        }
+      });
+
+      app.mount('#app');
+    }
+
+    // Load scripts in strict order: Vue → vue-demi → vue-office-pptx → mount
+    var isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    var vueSrc = isDev ? './vendor/vue.global.js' : './vendor/vue.global.prod.js';
+
+    loadScript(vueSrc, function() {
+      console.log('[PPT Viewer] Vue loaded');
+      loadScript('./vendor/vue-demi.iife.js', function() {
+        console.log('[PPT Viewer] vue-demi loaded');
+        loadScript('./vendor/vue-office-pptx.umd.js', function() {
+          console.log('[PPT Viewer] vue-office-pptx loaded');
+          mountApp();
+        }, function() { showError('PPT预览组件加载失败'); });
+      }, function() { showError('vue-demi 加载失败'); });
+    }, function() { showError('Vue 加载失败'); });
+  </script>
+</body>
+</html>
