@@ -326,6 +326,11 @@
         <button class="api-btn" onclick="apiSetContent()">设置内容</button>
         <button class="api-btn" onclick="apiInsertParagraph()">插入段落</button>
         <button class="api-btn" onclick="apiInsertImage()">插入图片</button>
+        <button class="api-btn" onclick="apiInsertColumns()">插入分栏</button>
+        <button class="api-btn" onclick="apiInsertTable()">插入表格</button>
+        <button class="api-btn" onclick="apiInsertChart()">插入图表</button>
+        <button class="api-btn" onclick="apiInsertMindmap()">插入思维导图</button>
+        <button class="api-btn" onclick="apiInsertMermaid()">插入 Mermaid</button>
         <button class="api-btn" onclick="apiGetLastElement()">查询最近元素</button>
         <button class="api-btn" onclick="apiUpdateLastElement()">更新最近元素</button>
         <button class="api-btn" onclick="apiDeleteLastElement()">删除最近元素</button>
@@ -721,6 +726,108 @@
       if (msg) msg.success('已插入图片元素：' + (window.__lastSdkElementId || 'unknown'));
     }
 
+    function apiInsertColumns() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst || !inst.insert) { if (msg) msg.error('insert() 方法不可用'); return; }
+      const inserted = inst.insert({
+        type: 'columns',
+        data: {
+          columns: ['左侧分栏内容', '右侧分栏内容']
+        }
+      });
+      window.__lastSdkElementId = inserted && inserted.id;
+      if (msg) msg.success('已插入分栏：' + (window.__lastSdkElementId || 'unknown'));
+    }
+
+    function apiInsertTable() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst || !inst.insert) { if (msg) msg.error('insert() 方法不可用'); return; }
+      const inserted = inst.insert({
+        type: 'table',
+        data: {
+          rows: [
+            ['表头 1', '表头 2'],
+            ['单元格 1', '单元格 2'],
+            ['单元格 3', '单元格 4']
+          ],
+          withHeaderRow: true
+        }
+      });
+      window.__lastSdkElementId = inserted && inserted.id;
+      if (msg) msg.success('已插入表格：' + (window.__lastSdkElementId || 'unknown'));
+    }
+
+    function apiInsertChart() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst || !inst.insert) { if (msg) msg.error('insert() 方法不可用'); return; }
+      const inserted = inst.insert({
+        type: 'chart',
+        data: {
+          config: {
+            type: 'bar',
+            title: 'SDK 图表示例',
+            data: {
+              categories: ['一月', '二月', '三月'],
+              series: [{ name: '销量', data: [12, 18, 9] }]
+            },
+            config: {
+              theme: 'default',
+              showLegend: true,
+              showGrid: true,
+              showTooltip: true
+            }
+          }
+        }
+      });
+      window.__lastSdkElementId = inserted && inserted.id;
+      if (msg) msg.success('已插入图表：' + (window.__lastSdkElementId || 'unknown'));
+    }
+
+    function apiInsertMindmap() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst || !inst.insert) { if (msg) msg.error('insert() 方法不可用'); return; }
+      const inserted = inst.insert({
+        type: 'mindmap',
+        data: {
+          config: {
+            nodeData: {
+              topic: 'SDK 中心主题',
+              id: 'root',
+              children: [
+                { topic: '分支一', id: 'branch-1' },
+                { topic: '分支二', id: 'branch-2' }
+              ]
+            },
+            linkData: {}
+          }
+        }
+      });
+      window.__lastSdkElementId = inserted && inserted.id;
+      if (msg) msg.success('已插入思维导图：' + (window.__lastSdkElementId || 'unknown'));
+    }
+
+    function apiInsertMermaid() {
+      const inst = window.editor;
+      const msg = window.JitWordMessage;
+      if (!inst || !inst.insert) { if (msg) msg.error('insert() 方法不可用'); return; }
+      const inserted = inst.insert({
+        type: 'mermaid',
+        data: {
+          code: [
+            'graph TD',
+            '  A[SDK 开始] --> B[处理数据]',
+            '  B --> C[渲染完成]'
+          ].join('\n')
+        }
+      });
+      window.__lastSdkElementId = inserted && inserted.id;
+      if (msg) msg.success('已插入 Mermaid：' + (window.__lastSdkElementId || 'unknown'));
+    }
+
     /**
      * 获取文档内容 - 演示 getJSON() API
      */
@@ -792,6 +899,75 @@ ${contentStr.substring(0, 500)}${contentStr.length > 500 ? '...' : ''}`;
             data: {
               url: 'https://picsum.photos/seed/jitword-sdk-updated/720/360',
               alt: 'JitWord SDK 更新后的图片'
+            }
+          }
+        : current.type === 'columns'
+        ? {
+            data: {
+              columns: ['更新后的左栏内容', '更新后的右栏内容']
+            }
+          }
+        : current.type === 'table'
+        ? {
+            data: {
+              rows: [
+                ['更新表头 1', '更新表头 2'],
+                ['更新单元格 A', '更新单元格 B']
+              ],
+              withHeaderRow: true
+            }
+          }
+        : current.type === 'chart'
+        ? {
+            data: {
+              config: {
+                type: 'line',
+                title: 'SDK 图表已更新',
+                data: {
+                  categories: ['Q1', 'Q2', 'Q3', 'Q4'],
+                  series: [{ name: '营收', data: [30, 44, 28, 52] }]
+                },
+                config: {
+                  theme: 'default',
+                  showLegend: true,
+                  showGrid: true,
+                  showTooltip: true
+                }
+              }
+            }
+          }
+        : current.type === 'mindmap'
+        ? {
+            data: {
+              config: {
+                nodeData: {
+                  topic: 'SDK 中心主题（已更新）',
+                  id: 'root',
+                  children: [
+                    { topic: '更新分支一', id: 'branch-1' },
+                    { topic: '更新分支二', id: 'branch-2' },
+                    { topic: '新增分支三', id: 'branch-3' }
+                  ]
+                },
+                linkData: {}
+              }
+            }
+          }
+        : current.type === 'mermaid'
+        ? {
+            data: {
+              code: [
+                'graph TD',
+                '  A[SDK 已更新] --> B[继续测试]',
+                '  B --> C[完成]'
+              ].join('\n')
+            }
+          }
+        : current.type === 'flowchart'
+        ? {
+            data: {
+              title: 'SDK 流程图已更新',
+              message: '流程图占位内容已通过 updateElement() 更新'
             }
           }
         : {

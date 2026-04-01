@@ -278,6 +278,12 @@ server {
 - `divider`
 - `bulletList`
 - `orderedList`
+- `columns`
+- `table`
+- `chart`
+- `mindmap`
+- `mermaid`
+- `flowchart`
 
 说明：
 
@@ -948,4 +954,3 @@ await JitWordSDK.comments.create({
 </body>
 </html>
 ```
-
