@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JitWord - 离线模式演示（完整功能体验）</title>
+  <title>意念LineOffice - 离线模式演示（完整功能体验）</title>
   
   <!--
     Standalone build demo (CDN externalized heavy libs: Vue/Arco/ECharts/MindElixir)
@@ -310,7 +310,7 @@
     <div class="loading-text">正在初始化编辑器资源...</div>
   </div>
 
-  <div class="badge"><a href="https://jitword.com" style="color: white; text-decoration: none;" target="_blank">JitWord AI文档 ✨</a></div>
+  <div class="badge"><a href="https://jitword.com" style="color: white; text-decoration: none;" target="_blank">意念LineOffice AI文档 ✨</a></div>
 
   <div id="app">
     <!-- API Demo Panel -->
@@ -318,7 +318,7 @@
       <div class="panel-left">
         <div class="panel-icon">[SDK]</div>
         <div class="panel-text">
-          <strong>JitWord 在线演示</strong>
+          <strong>意念LineOffice 在线演示</strong>
           <small>协同模式：第一阶段元素 API + 实时协作体验</small>
         </div>
       </div>
@@ -342,7 +342,7 @@
     </div>
 
     <div class="demo-header">
-      <h1>🚀 PxEditor 独立构建示例</h1>
+      <h1>🚀 意念LineOffice 独立构建示例</h1>
       <p>
         这是一个零依赖的演示页面：适合快速体验、嵌入集成与免配置使用。
       </p>
@@ -402,6 +402,11 @@
         console.log('📄 Generated new document ID:', currentDocId);
       } else {
         console.log('📄 Loaded document ID from URL:', currentDocId);
+        // 检查是否通过分享链接打开
+        const isShare = getUrlParam('share') === 'true';
+        if (isShare) {
+          console.log('🔗 Opening shared document:', currentDocId);
+        }
       }
       
       // Track current document name
@@ -415,14 +420,51 @@
       
       const editor = new Jitword({
         hold: "editor-container",
-        appTitle: 'JitWord 协作文档',
-        appTitleShort: 'JitWord',
+        appTitle: '意念LineOffice 协作文档',
+        appTitleShort: 'LineOffice',
         logo: 'https://word.jitword.com/px-editor/logo.png',
         logoHref: 'https://jitword.com/',
         documentTitle: currentDocName,  // Will be updated dynamically
         readModeBadgeText: '阅读模式',
         baseApiUrl: '/api/v1',
         wsServer: 'wss://word.jitword.com/ws',
+        
+        // 安全配置
+        security: {
+          enableTokenAuth: true,
+          tokenStorage: 'localStorage', // 或 'sessionStorage'
+          tokenKey: 'jitword_auth_token',
+          refreshTokenKey: 'jitword_refresh_token',
+          tokenExpiryCheck: true,
+          // CORS 配置
+          cors: {
+            enabled: true,
+            allowedOrigins: ['*'], // 在生产环境中应该设置为具体的域名
+            allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization'],
+            credentials: true
+          },
+          // 传输安全
+          transport: {
+            enforceHttps: true,
+            secureCookies: true,
+            xssProtection: true,
+            contentSecurityPolicy: true
+          }
+        },
+        
+        // 隐私和数据处理
+        privacy: {
+          dataProcessing: {
+            enableAnonymization: true,
+            dataRetentionPeriod: 30, // 天
+            userConsent: true
+          },
+          policyLinks: {
+            privacy: './PRIVACY.md',
+            terms: './TERMS.md'
+          }
+        },
         
         // Set current document ID (room name will be auto-generated as doc-${documentId})
         currentDocumentId: currentDocId,
@@ -447,6 +489,32 @@
           title: '分享文档',
           showQRCode: true,
           enableReadLink: true,
+          // 自定义分享链接生成
+          generateShareLink: (docId) => {
+            // 生成包含文档 ID 的分享链接
+            return `${window.location.origin}${window.location.pathname}?docId=${docId}&share=true`;
+          },
+          // 处理分享链接打开
+          handleShareLink: (url) => {
+            // 从 URL 中提取文档 ID
+            const urlParams = new URLSearchParams(url.split('?')[1]);
+            const docId = urlParams.get('docId');
+            if (docId) {
+              // 设置当前文档 ID 并加载内容
+              currentDocId = docId;
+              setUrlParam('docId', docId);
+              editor.setCurrentDocumentId(docId);
+              // 从本地存储加载文档内容
+              const savedContent = localStorage.getItem(`lineoffice_doc_${docId}`);
+              if (savedContent) {
+                try {
+                  editor.setContent(JSON.parse(savedContent));
+                } catch (error) {
+                  console.error('加载分享文档失败:', error);
+                }
+              }
+            }
+          }
         },
         
         // Version history
@@ -460,9 +528,9 @@
           color: '#' + Math.floor(Math.random()*16777215).toString(16)
         },
         
-        // Enable auto-save and auto-load (handled internally by SDK)
-        enableAutoSave: true,
-        enableAutoLoad: true,
+        // 禁用自动保存，使用本地存储保存
+        enableAutoSave: false,
+        enableAutoLoad: false,
         
         // Document list: auto-load from API since baseApiUrl is configured
         docsConfig: {
@@ -471,7 +539,7 @@
         
         // Default content for new documents
         defaultValue: `
-          <h1>👋 欢迎来到 JitWord</h1>
+          <h1>👋 欢迎来到 意念LineOffice</h1>
           <p>这是一个<b>协同编辑</b>文档系统，支持多人实时协作。</p>
           <blockquote>通过 <code>editor.setContent(html)</code> 方法可以主动设置文档内容。</blockquote>
           <ul>
@@ -486,7 +554,15 @@
         // You can still provide custom handler if needed
         onSave: ({ content, currentDocumentId }) => { 
           console.log('💾 Manual save triggered for:', currentDocumentId); 
-          // SDK will handle the actual save
+          // 使用本地存储保存文档内容
+          try {
+            localStorage.setItem(`lineoffice_doc_${currentDocumentId}`, JSON.stringify(content));
+            console.log('📁 文档已保存到本地存储');
+            if (Message) Message.success('保存成功');
+          } catch (error) {
+            console.error('保存失败:', error);
+            if (Message) Message.error('保存失败，请检查存储空间');
+          }
         },
         onChange: (content) => {
           // Just log changes - auto-save is handled by SDK
@@ -550,7 +626,17 @@
         onEditorReady: (ed) => {
           console.log('✅ Editor ready');
           editorInstance = ed;
-          // Document content is automatically loaded by SDK
+          // 从本地存储加载文档内容
+          const savedContent = localStorage.getItem(`lineoffice_doc_${currentDocId}`);
+          if (savedContent) {
+            try {
+              const content = JSON.parse(savedContent);
+              console.log('📁 从本地存储加载文档内容');
+              editor.setContent(content);
+            } catch (error) {
+              console.error('加载本地存储内容失败:', error);
+            }
+          }
           // Expose globally for API demo panel
           window.editor = editor;
           window.JitWordMessage = Message;
@@ -590,21 +676,23 @@
       const container = document.getElementById('editor-container');
       
       // Update loading text
-      const loaderText = loader.querySelector('.loading-text');
+      const loaderText = loader ? loader.querySelector('.loading-text') : null;
       if (loaderText) loaderText.textContent = '正在加载编辑器...';
 
       // Observe for editor mount
-      const observer = new MutationObserver((mutations, obs) => {
-        if (container.children.length > 0) {
-          loader.classList.add('fade-out');
-          setTimeout(() => {
-            if (loader.parentNode) loader.parentNode.removeChild(loader);
-          }, 500);
-          obs.disconnect();
-        }
-      });
-      
-      observer.observe(container, { childList: true, subtree: true });
+      if (container) {
+        const observer = new MutationObserver((mutations, obs) => {
+          if (container.children.length > 0) {
+            if (loader) loader.classList.add('fade-out');
+            setTimeout(() => {
+              if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+            }, 500);
+            obs.disconnect();
+          }
+        });
+        
+        observer.observe(container, { childList: true, subtree: true });
+      }
 
       var header=document.querySelector('.demo-header h1');
       var para=document.querySelector('.demo-header p');
@@ -718,8 +806,8 @@
       const inserted = inst.insert({
         type: 'image',
         data: {
-          url: 'https://picsum.photos/seed/jitword-sdk/720/360',
-          alt: 'JitWord SDK 示例图片'
+          url: 'https://picsum.photos/seed/lineoffice-sdk/720/360',
+          alt: '意念LineOffice SDK 示例图片'
         }
       });
       window.__lastSdkElementId = inserted && inserted.id;
@@ -897,8 +985,8 @@ ${contentStr.substring(0, 500)}${contentStr.length > 500 ? '...' : ''}`;
       const patch = current.type === 'image'
         ? {
             data: {
-              url: 'https://picsum.photos/seed/jitword-sdk-updated/720/360',
-              alt: 'JitWord SDK 更新后的图片'
+              url: 'https://picsum.photos/seed/lineoffice-sdk-updated/720/360',
+              alt: '意念LineOffice SDK 更新后的图片'
             }
           }
         : current.type === 'columns'
@@ -1045,19 +1133,35 @@ ${contentStr.substring(0, 500)}${contentStr.length > 500 ? '...' : ''}`;
         if (msg) msg.error('exportFile() 方法不可用');
         return;
       }
-      const blob = await inst.exportFile('pdf', {
-        autoDownload: false,
-        filename: 'jitword-sdk-demo.pdf'
-      });
-      alert('已生成 PDF Blob\\n\\n类型: ' + blob.type + '\\n大小: ' + blob.size + ' bytes');
-      if (msg) msg.success('已生成 PDF Blob');
+      try {
+        const blob = await inst.exportFile('pdf', {
+          autoDownload: false,
+          filename: 'lineoffice-demo.pdf'
+        });
+        if (blob) {
+          alert('已生成 PDF Blob\\n\\n类型: ' + blob.type + '\\n大小: ' + blob.size + ' bytes');
+          if (msg) msg.success('已生成 PDF Blob');
+        } else {
+          throw new Error('导出的 PDF 为空');
+        }
+      } catch (error) {
+        console.error('PDF 导出失败:', error);
+        const errorMsg = error && typeof error.message === 'string' ? error.message : '未知错误';
+        if (msg) msg.error('PDF 导出失败: ' + errorMsg);
+        // 提供备选方案：使用浏览器打印功能
+        if (confirm('PDF 导出失败，是否使用浏览器打印功能生成 PDF？')) {
+          window.print();
+        }
+      }
     }
 
     document.getElementById('sdk-import-file').addEventListener('change', async function(event) {
       const inst = window.editor;
       const msg = window.JitWordMessage;
-      const file = event.target && event.target.files ? event.target.files[0] : null;
-      if (!inst || !file) return;
+      if (!event || !event.target) { return; }
+      const file = event.target.files ? event.target.files[0] : null;
+      if (!inst) { alert('编辑器未初始化'); return; }
+      if (!file) { alert('请选择文件'); return; }
       if (!inst.importFile) {
         if (msg) msg.error('importFile() 方法不可用');
         return;
@@ -1085,7 +1189,8 @@ ${contentStr.substring(0, 500)}${contentStr.length > 500 ? '...' : ''}`;
         if (msg) msg.success('导入成功' + (result && result.summary ? '：' + result.summary : ''));
       } catch (error) {
         console.error('Import failed:', error);
-        if (msg) msg.error('导入失败: ' + (error && error.message ? error.message : '未知错误'));
+        const errMsg = error && typeof error.message === 'string' ? error.message : '未知错误';
+        if (msg) msg.error('导入失败: ' + errMsg);
       }
     });
 

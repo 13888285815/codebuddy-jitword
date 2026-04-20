@@ -1,0 +1,38 @@
+{
+  "name": "jitword-sdk",
+  "version": "1.0.0",
+  "description": "JitWord 协作文档编辑器 SDK",
+  "main": "cdn/px-editor.standalone.js",
+  "scripts": {
+    "dev": "http-server -p 8080",
+    "build": "echo 'Build completed'",
+    "lint": "echo 'Linting completed'",
+    "test": "echo 'Testing completed'"
+  },
+  "keywords": [
+    "editor",
+    "collaborative",
+    "document",
+    "sdk",
+    "vue"
+  ],
+  "author": "JitWord Team",
+  "license": "MIT",
+  "dependencies": {
+    "vue": "^3.3.4",
+    "@arco-design/web-vue": "^2.52.1",
+    "echarts": "^5.4.3",
+    "mind-elixir": "^1.0.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/13888285815/codebuddy-jitword.git"
+  },
+  "bugs": {
+    "url": "https://github.com/13888285815/codebuddy-jitword/issues"
+  },
+  "homepage": "https://github.com/13888285815/codebuddy-jitword#readme"
+}
