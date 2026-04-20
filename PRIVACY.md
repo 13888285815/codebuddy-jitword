@@ -49,8 +49,8 @@ JitWord 协作文档编辑器（以下简称「本产品」）重视用户隐私
 
 如果您对本隐私政策有任何疑问或建议，请通过以下方式联系我们：
 
-- 电子邮件：privacy@jitword.com
-- 官方网站：https://jitword.com
+- 电子邮件：privacy@tools.yndxw.com
+- 官方网站：https://tools.yndxw.com
 
 ---
 

@@ -62,7 +62,7 @@ window.onload = function() {
   const editor = new Jitword({
     hold: "col-editor", // 容器 ID
     appTitle: 'JitWord 协作文档',
-    logo: 'https://jitword.com/logo.png',
+    logo: 'tools.yndxw.comlogo.png',
     enableAI: true,
     // ...其他配置
   });
@@ -914,8 +914,8 @@ await JitWordSDK.comments.create({
         
         // 基础配置
         appTitle: 'JitWord 协作文档',
-        logo: 'https://jitword.com/logo.png',
-        logoHref: 'https://jitword.com/',
+        logo: 'tools.yndxw.comlogo.png',
+        logoHref: 'tools.yndxw.com',
         locale: 'zh',
         placeholder: '在此输入内容...',
         
